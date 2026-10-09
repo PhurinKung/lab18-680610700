@@ -96,7 +96,12 @@ export const useEnrollmentStore = create<EnrollmentStore>()((set) => ({
     }),
 
   addStudent: async () => {
-    throw new Error("TODO การบ้าน 1.3: ยังไม่ได้เชื่อม POST /students");
+    // const create = await api<Student>("/students", {
+    //   method: "POST",
+    //   body: created,
+    // });
+    // set((state) => ({ courses: [...state.courses, toCourse(created)] }));
+    // throw new Error("TODO การบ้าน 1.3: ยังไม่ได้เชื่อม POST /students");
   },
 
   updateStudent: async () => {

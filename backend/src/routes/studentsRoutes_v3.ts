@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { zStudentPostBody, zStudentId } from "../libs/zodValidators.js";
+import { zStudentPostBody, zStudentPutBody, zStudentId } from "../libs/zodValidators.js";
 
 import type { Student, CustomRequest } from "../libs/types.js";
 
@@ -172,6 +172,128 @@ router.post(
       return res.status(201).json({
         success: true,
         data: created,
+      });
+    } catch (err) {
+      return res.status(500).json({
+        success: false,
+        message: "Somthing is wrong, please try again",
+        error: err,
+      });
+    }
+  },
+);
+
+// PUT /api/v3/students,  body = { studentId, firstName?, lastName?, program?, interests?, emails? }
+// edit student
+router.put(
+  "/",
+  authenticateToken,
+  checkRoles,
+  async (req: CustomRequest, res: Response) => {
+    try {
+      // get new student info from req.body
+      const body = (await req.body) as Student;
+      const user = req.user;
+      const userRole = user?.role;
+      
+      // validate req.body with predefined validator
+      const result = zStudentPutBody.safeParse(body); // check zod
+      if (!result.success) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: result.error.issues[0]?.message,
+        });
+      }
+      const { studentId, firstName, lastName, program, interests, emails } =
+        result.data;
+      
+      if (userRole !== "ADMIN") {
+        if(user?.studentId!==studentId)
+        return res.status(403).json({
+          success: false,
+          message: "Forbidden",
+        });
+      }
+
+      //check if the studentId exists in DB
+      const student = await prisma.student.findUnique({
+        where: { studentId: studentId },
+      });
+      if (!student) {
+        return res.status(404).json({
+          success: false,
+          message: `Student ${studentId} does not exists`,
+        });
+      }
+
+
+      const updated =  await prisma.student.update({
+        where: { studentId: studentId },
+        data: {
+          ...(studentId != null && { studentId }),
+          ...(firstName != null && { firstName }),
+          ...(lastName != null && { lastName }),
+          ...(program != null && { program }),
+          ...(interests != null && { interests }),
+          ...(emails != null && { emails }),
+        }
+      })
+
+      return res.status(200).json({
+        success: true,
+        data: updated,
+        message: `Student ${studentId} has been updated successfully`,
+      });
+    } catch (err) {
+      return res.status(500).json({
+        success: false,
+        message: "Somthing is wrong, please try again",
+        error: err,
+      });
+    }
+  },
+);
+
+// DELETE /api/v3/students, body = { studentId}
+// delete student
+router.delete(
+  "/",
+  authenticateToken,
+  checkRoleAdmin,
+  async (req: CustomRequest, res: Response) => {
+    try {
+      // get new student info from req.body
+      const result = zStudentId.safeParse(req.body?.courseId);
+      if (!result.success) {
+        return res.status(400).json({
+          success: false,
+          message: "Validation failed",
+          errors: result.error.issues[0]?.message,
+        });
+      }
+      const studentId = result.data;
+
+      //check if the studentId exists in DB
+      const student = await prisma.student.findUnique({
+        where: { studentId: studentId },
+      });
+      if (!student) {
+        return res.status(404).json({
+          success: false,
+          message: `Student ${studentId} does not exists`,
+        });
+      }
+
+      const [, deleted] = await prisma.$transaction([
+        prisma.enrollment.deleteMany({ where: { student: { studentId } } }),
+        prisma.student.delete({ where: { studentId } }),
+      ]);
+
+      return res.status(200).json({
+        success: true,
+        message: `Student ${studentId} has been deleted successfully`,
+        data: deleted,
       });
     } catch (err) {
       return res.status(500).json({
