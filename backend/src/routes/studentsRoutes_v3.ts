@@ -231,7 +231,7 @@ router.put(
       const updated =  await prisma.student.update({
         where: { studentId: studentId },
         data: {
-          ...(studentId != null && { studentId }),
+          // ...(studentId != null && { studentId }),
           ...(firstName != null && { firstName }),
           ...(lastName != null && { lastName }),
           ...(program != null && { program }),
@@ -264,7 +264,7 @@ router.delete(
   async (req: CustomRequest, res: Response) => {
     try {
       // get new student info from req.body
-      const result = zStudentId.safeParse(req.body?.courseId);
+      const result = zStudentId.safeParse(req.body?.studentId);
       if (!result.success) {
         return res.status(400).json({
           success: false,
@@ -276,7 +276,7 @@ router.delete(
 
       //check if the studentId exists in DB
       const student = await prisma.student.findUnique({
-        where: { studentId: studentId },
+        where: { studentId },
       });
       if (!student) {
         return res.status(404).json({
@@ -286,7 +286,7 @@ router.delete(
       }
 
       const [, deleted] = await prisma.$transaction([
-        prisma.enrollment.deleteMany({ where: { student: { studentId } } }),
+        prisma.enrollment.deleteMany({ where: { studentId } }),
         prisma.student.delete({ where: { studentId } }),
       ]);
 

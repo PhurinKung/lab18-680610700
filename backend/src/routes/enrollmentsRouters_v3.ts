@@ -1,5 +1,5 @@
 import { Router, type Request, type Response } from "express";
-import { zEnrollmentBody } from "../libs/zodValidators.ts";
+import { zEnrollmentBody, zEnrollmentPutBody } from "../libs/zodValidators.ts";
 
 import type { CustomRequest } from "../libs/types.ts";
 
@@ -130,7 +130,7 @@ router.put(
   async (req: CustomRequest, res: Response) => {
     try {
       // validate req.body
-      const result = zEnrollmentBody.safeParse(req.body);
+      const result = zEnrollmentPutBody.safeParse(req.body);
       const user = req.user;
       const userRole = user?.role;
 
@@ -141,13 +141,13 @@ router.put(
           errors: result.error.issues[0]?.message,
         });
       }
-      const { studentId, courseId} = result.data;
+      const { studentId, courseId, newCourseId } = result.data;
 
       if (userRole !== "ADMIN") {
         if(user?.studentId!==studentId)
         return res.status(403).json({
           success: false,
-          message: "Forbidden",
+          message: "Forbidden Access",
         });
       }
 
@@ -164,8 +164,9 @@ router.put(
           message: `Enrollment of student ${studentId} Course ${courseId} does not exists`,
         });
       }
+      
       //วิชาใหม่ = วิชาเดิม (400)
-      if(enroll.courseId === courseId) {
+      if(newCourseId === courseId) {
         return res.status(400).json({
           success: false,
           message: `Course is the same as the old one`,
@@ -173,7 +174,7 @@ router.put(
       }
 
       // วิชาใหม่ไม่มีจริง (404)
-      const course = await prisma.course.findUnique({ where: { courseId: courseId } })
+      const course = await prisma.course.findUnique({ where: { courseId: newCourseId } })
       if(!course) {
         return res.status(404).json({
           success: false,
@@ -182,11 +183,11 @@ router.put(
       }
 
       //ลงวิชาใหม่ไว้แล้ว (409)
-      const isnotnew = await prisma.enrollment.findFirst({ where: { studentId, courseId } });
+      const isnotnew = await prisma.enrollment.findFirst({ where: { studentId, courseId: newCourseId } });
       if(isnotnew) {
         return res.status(409).json({
           success: false,
-          message: `Course ${courseId} already exists`,
+          message: `Course ${newCourseId} already exists`,
         })
       }
 
@@ -195,7 +196,7 @@ router.put(
         where: { id: enroll.id },
         data: {
           ...(studentId != null && { studentId }),
-          ...(courseId != null && { courseId }),
+          ...(newCourseId  != null && { newCourseId }),
         },
       });
 
@@ -226,7 +227,7 @@ router.delete(
   async (req: CustomRequest, res: Response) => {
     try {
       // validate courseId
-      const result = zEnrollmentBody.safeParse(req.body?.courseId);
+      const result = zEnrollmentBody.safeParse(req.body);
       const user = req.user;
       const userRole = user?.role;
       if (!result.success) {
@@ -245,13 +246,15 @@ router.delete(
         });
       }
 
-      const deleted = await prisma.enrollment.deleteMany({ where: { studentId, courseId } });
-      if(!deleted) {
+      const enroll = await prisma.enrollment.findFirst({ where: { studentId, courseId } });
+      if(!enroll) {
         return res.status(404).json({
           success: false,
           message: `Enrollment of student ${studentId} Course ${courseId} does not exist`,
         });
       }
+
+      const deleted = await prisma.enrollment.delete({ where: { id: enroll.id } });
 
       return res.status(200).json({
         success: true,
