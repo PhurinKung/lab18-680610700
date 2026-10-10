@@ -9,7 +9,7 @@ import { checkRoles } from "../middlewares/checkRolesDBMiddleware.ts";
 
 // import database
 import { PrismaClient } from "../../generated/prisma/client.ts";
-import { success } from "zod";
+// import { success } from "zod";
 const prisma = new PrismaClient();
 
 const router = Router();
@@ -178,7 +178,7 @@ router.put(
       if(!course) {
         return res.status(404).json({
           success: false,
-          message: `Course ${courseId} does not exist`,
+          message: `Course ${newCourseId} does not exist`,
         })
       }
 
@@ -194,10 +194,7 @@ router.put(
       // update only fields that were sent (skip null/undefined)
       const updated = await prisma.enrollment.update({
         where: { id: enroll.id },
-        data: {
-          ...(studentId != null && { studentId }),
-          ...(newCourseId  != null && { newCourseId }),
-        },
+        data: { courseId: newCourseId },
       });
 
       return res.status(200).json({
